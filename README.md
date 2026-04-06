@@ -78,7 +78,20 @@ python scripts/run_sweep.py --config configs/goodreads.yaml --ablate-prompts
 ```
 
 Results are saved as `results_<name>.json` (e.g. `results_simple.json`,
-`results_detailed.json`).
+`results_detailed.json`). To plot them:
+
+```bash
+# Point at the output directory — picks up all results_*.json automatically
+python scripts/plot_results.py --results-dir outputs/goodreads/
+
+# Or list files explicitly
+python scripts/plot_results.py --results outputs/goodreads/results_simple.json \
+                                          outputs/goodreads/results_detailed.json
+```
+
+This produces:
+- Per-variant plots (`cold_start_results_simple.png`, etc.)
+- A combined **`prompt_ablation.png`** comparing all variants side by side per method
 
 ## Smoke testing (local)
 
