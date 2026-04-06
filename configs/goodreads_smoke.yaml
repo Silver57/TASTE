@@ -1,14 +1,14 @@
-# configs/goodreads.yaml — GoodReads cold-start experiment
+# configs/goodreads_smoke.yaml — Minimal GoodReads config for local smoke testing
 dataset: goodreads
 data_dir: data/raw/GoodReads
-output_dir: outputs/goodreads
-pair_dir: data/goodreads_pairs
+output_dir: outputs/goodreads_smoke
+pair_dir: data/goodreads_smoke_pairs
 
-min_reviews_per_book: 20000
+min_reviews_per_book: 500
 
-# Pair generation
-n_users: 10
-pairs_per_user: 40
+# Pair generation — tiny
+n_users: 3
+pairs_per_user: 15
 prompt_templates:
   simple: "Which book does the reader prefer: {title_a} or {title_b}?"
   detailed: "Given these two books, which one would the reader enjoy more? Book A: {title_a}. Book B: {title_b}. The reader prefers:"
@@ -18,22 +18,22 @@ default_prompt: simple
 # Model
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-# Cold-start sweep
-cold_start_sizes: [3, 5, 10]
-eval_pairs_per_user: 10
-n_eval_users: 3
+# Cold-start sweep — minimal
+cold_start_sizes: [3]
+eval_pairs_per_user: 5
+n_eval_users: 2
 random_seed: 42
 
-# Training
+# Training — fast
 num_train_epochs: 1
 batch_size: 2
 learning_rate: 2.0e-5
 max_grad_norm: 1.0
-max_seq_len: 256
+max_seq_len: 128
 
-# LoRA
-lora_r: 8
-lora_alpha: 16
+# LoRA — small
+lora_r: 4
+lora_alpha: 8
 lora_target_modules: ["q_proj", "v_proj"]
 lora_dropout: 0.05
 

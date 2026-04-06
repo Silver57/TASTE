@@ -10,7 +10,9 @@ user preferences from minimal interaction data.
 cold_start_thesis/
 ├── configs/
 │   ├── netflix.yaml          # Netflix experiment config
-│   └── goodreads.yaml        # GoodReads experiment config
+│   ├── netflix_smoke.yaml    # Netflix smoke-test config (tiny local run)
+│   ├── goodreads.yaml        # GoodReads experiment config
+│   └── goodreads_smoke.yaml  # GoodReads smoke-test config (tiny local run)
 ├── src/
 │   ├── __init__.py
 │   ├── device.py             # Device / dtype auto-detection
@@ -50,6 +52,48 @@ python scripts/run_sweep.py --config configs/goodreads.yaml
 # 5. Plot results
 python scripts/plot_results.py --results outputs/goodreads/results.json
 ```
+
+## Prompt template ablation
+
+Each config defines multiple named prompt templates under `prompt_templates` with
+a `default_prompt` key that selects which one runs normally:
+
+```yaml
+prompt_templates:
+  simple: "Which book does the reader prefer: {title_a} or {title_b}?"
+  detailed: "Given these two books, which one would the reader enjoy more? ..."
+  system: "You are a book recommendation assistant. ..."
+default_prompt: simple
+```
+
+By default only the `default_prompt` variant is used. Add `--ablate-prompts` to
+run **all** variants:
+
+```bash
+# Generate pairs for every template
+python scripts/prepare_data.py --config configs/goodreads.yaml --ablate-prompts
+
+# Train + evaluate every template
+python scripts/run_sweep.py --config configs/goodreads.yaml --ablate-prompts
+```
+
+Results are saved as `results_<name>.json` (e.g. `results_simple.json`,
+`results_detailed.json`).
+
+## Smoke testing (local)
+
+Use `--smoke-test` to swap any config for its `*_smoke.yaml` counterpart — tiny
+user counts, a single cold-start size, and smaller LoRA rank so you can verify
+the pipeline end-to-end on a laptop:
+
+```bash
+python scripts/prepare_data.py --config configs/goodreads.yaml --smoke-test
+python scripts/run_sweep.py   --config configs/goodreads.yaml --smoke-test
+```
+
+This automatically loads `configs/goodreads_smoke.yaml` instead. Both flags
+compose: `--smoke-test --ablate-prompts` runs all prompt variants with the tiny
+smoke config.
 
 ## Adding a new dataset
 

@@ -1,15 +1,14 @@
-# configs/netflix.yaml — Netflix cold-start experiment
+# configs/netflix_smoke.yaml — Minimal Netflix config for local smoke testing
 dataset: netflix
 data_dir: data/raw/Netflix
-output_dir: outputs/netflix
-pair_dir: data/netflix_pairs
+output_dir: outputs/netflix_smoke
+pair_dir: data/netflix_smoke_pairs
 
-# Data filtering
-min_reviews_per_movie: 20000
+min_reviews_per_movie: 500
 
-# Pair generation
-n_users: 50
-pairs_per_user: 160
+# Pair generation — tiny
+n_users: 3
+pairs_per_user: 15
 prompt_templates:
   simple: "Which movie does the client prefer: {title_a} or {title_b}?"
   detailed: "Given these two movies, which one would the viewer enjoy more? Movie A: {title_a}. Movie B: {title_b}. The viewer prefers:"
@@ -19,23 +18,23 @@ default_prompt: simple
 # Model
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-# Cold-start sweep
-cold_start_sizes: [5, 10, 20, 50]
-eval_pairs_per_user: 20
-n_eval_users: 10
+# Cold-start sweep — minimal
+cold_start_sizes: [3]
+eval_pairs_per_user: 5
+n_eval_users: 2
 random_seed: 42
 
-# Training
-num_train_epochs: 3
+# Training — fast
+num_train_epochs: 1
 batch_size: 2
 learning_rate: 2.0e-5
 max_grad_norm: 1.0
-max_seq_len: 512
+max_seq_len: 128
 
-# LoRA
-lora_r: 16
-lora_alpha: 32
-lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+# LoRA — small
+lora_r: 4
+lora_alpha: 8
+lora_target_modules: ["q_proj", "v_proj"]
 lora_dropout: 0.05
 
 # Loss hyperparameters

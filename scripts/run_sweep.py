@@ -48,6 +48,18 @@ def load_config(path: str, overrides: dict) -> dict:
     return cfg
 
 
+def _smoke_config(config_path: str) -> str:
+    """Derive the smoke-test config path from a regular config path."""
+    p = Path(config_path)
+    smoke = p.with_stem(p.stem + "_smoke")
+    if not smoke.exists():
+        raise FileNotFoundError(
+            f"Smoke config not found: {smoke}\n"
+            f"Expected a *_smoke.yaml next to {p.name}"
+        )
+    return str(smoke)
+
+
 def load_jsonl(path):
     with open(path) as f:
         return [json.loads(line) for line in f]
@@ -98,28 +110,31 @@ class UserSplitter:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main():
-    parser = argparse.ArgumentParser(description="Cold-start sweep")
-    parser.add_argument("--config", required=True)
-    parser.add_argument("--cold_start_sizes", type=int, nargs="+", default=None)
-    parser.add_argument("--n_eval_users", type=int, default=None)
-    parser.add_argument("--num_train_epochs", type=int, default=None)
-    args = parser.parse_args()
+def resolve_templates(cfg, ablate: bool) -> dict[str, str]:
+    """Return {name: template_string} dict — same logic as prepare_data."""
+    if "prompt_templates" in cfg:
+        templates = cfg["prompt_templates"]
+        default = cfg.get("default_prompt", next(iter(templates)))
+        if ablate:
+            return templates
+        return {default: templates[default]}
+    return {"default": cfg["prompt_template"]}
 
-    cfg = load_config(args.config, {
-        "cold_start_sizes": args.cold_start_sizes,
-        "n_eval_users": args.n_eval_users,
-        "num_train_epochs": args.num_train_epochs,
-    })
+
+def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None):
+    """Run a single cold-start sweep. Core logic extracted from old main()."""
 
     SIZES = cfg["cold_start_sizes"]
     N_EVAL = cfg["n_eval_users"]
     EVAL_PAIRS = cfg["eval_pairs_per_user"]
     SEED = cfg["random_seed"]
     MODEL_ID = cfg["model_id"]
-    pair_dir = Path(cfg["pair_dir"])
-    out_dir = Path(cfg["output_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if prompt_name:
+        print(f"\n{'#' * 50}")
+        print(f"  PROMPT VARIANT: {prompt_name!r}")
+        print(f"{'#' * 50}")
 
     print(f"Device: {DEVICE}  |  dtype: {TORCH_DTYPE}")
     print(f"Sizes: {SIZES}  |  Users: {N_EVAL}  |  Epochs: {cfg['num_train_epochs']}")
@@ -136,7 +151,6 @@ def main():
         task_type=TaskType.CAUSAL_LM,
     )
 
-    # Shared trainer kwargs
     train_kw = dict(
         learning_rate=cfg["learning_rate"],
         num_train_epochs=cfg["num_train_epochs"],
@@ -264,11 +278,13 @@ def main():
     # ── Save raw results ──────────────────────────────────────────────────────
     save_data = {
         "config": cfg,
+        "prompt_name": prompt_name,
         "eval_users": eval_users,
         "results": {m: dict(results[m]) for m in results},
         "elapsed_minutes": elapsed / 60,
     }
-    results_path = out_dir / "results.json"
+    suffix = f"_{prompt_name}" if prompt_name else ""
+    results_path = out_dir / f"results{suffix}.json"
     with open(results_path, "w") as f:
         json.dump(save_data, f, indent=2, default=str)
     print(f"\nResults saved to {results_path}")
@@ -276,11 +292,65 @@ def main():
     # ── Print summary ─────────────────────────────────────────────────────────
     mean_res, se_res = compute_summary(results, SIZES)
     print(f"\n{'═' * 50}")
-    print("RESULTS SUMMARY")
+    print(f"RESULTS SUMMARY{f' — {prompt_name!r}' if prompt_name else ''}")
     print(f"{'═' * 50}\n")
     print_results_table(mean_res, se_res, SIZES)
     run_wilcoxon_tests(results, SIZES)
     print(f"\nTotal runtime: {elapsed / 60:.1f} min")
+
+    return save_data
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Cold-start sweep")
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--cold_start_sizes", type=int, nargs="+", default=None)
+    parser.add_argument("--n_eval_users", type=int, default=None)
+    parser.add_argument("--num_train_epochs", type=int, default=None)
+    parser.add_argument(
+        "--ablate-prompts", action="store_true",
+        help="Run sweep for ALL prompt templates (default: only the default one)",
+    )
+    parser.add_argument(
+        "--smoke-test", action="store_true",
+        help="Swap config for its *_smoke.yaml variant (tiny local run)",
+    )
+    args = parser.parse_args()
+
+    config_path = args.config
+    if args.smoke_test:
+        config_path = _smoke_config(config_path)
+        print(f"[smoke-test] Using config: {config_path}")
+
+    cfg = load_config(config_path, {
+        "cold_start_sizes": args.cold_start_sizes,
+        "n_eval_users": args.n_eval_users,
+        "num_train_epochs": args.num_train_epochs,
+    })
+
+    pair_dir = Path(cfg["pair_dir"])
+    out_dir = Path(cfg["output_dir"])
+
+    templates = resolve_templates(cfg, args.ablate_prompts)
+    all_results = {}
+
+    for name in templates:
+        # Resolve data directory for this template variant
+        if len(templates) == 1:
+            t_pair_dir = pair_dir
+        else:
+            t_pair_dir = pair_dir / name
+
+        all_results[name] = run_sweep(
+            cfg, t_pair_dir, out_dir, prompt_name=name if len(templates) > 1 else None,
+        )
+
+    if len(all_results) > 1:
+        print(f"\n{'#' * 50}")
+        print("  PROMPT ABLATION COMPLETE")
+        print(f"{'#' * 50}")
+        for name, res in all_results.items():
+            print(f"  {name!r}: {res['elapsed_minutes']:.1f} min")
 
 
 if __name__ == "__main__":
