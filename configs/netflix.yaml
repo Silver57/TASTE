@@ -1,0 +1,42 @@
+# configs/netflix.yaml — Netflix cold-start experiment
+dataset: netflix
+data_dir: data/raw/Netflix
+output_dir: outputs/netflix
+pair_dir: data/netflix_pairs
+
+# Data filtering
+min_reviews_per_movie: 20000
+
+# Pair generation
+n_users: 50
+pairs_per_user: 160
+prompt_template: "Which movie does the client prefer: {title_a} or {title_b}?"
+
+# Model
+model_id: meta-llama/Meta-Llama-3-8B-Instruct
+
+# Cold-start sweep
+cold_start_sizes: [5, 10, 20, 50]
+eval_pairs_per_user: 20
+n_eval_users: 10
+random_seed: 42
+
+# Training
+num_train_epochs: 3
+batch_size: 2
+learning_rate: 2.0e-5
+max_grad_norm: 1.0
+max_seq_len: 512
+
+# LoRA
+lora_r: 16
+lora_alpha: 32
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+lora_dropout: 0.05
+
+# Loss hyperparameters
+dpo_beta: 0.1
+ipo_beta: 0.1
+kto_beta: 0.1
+simpo_beta: 2.0
+simpo_gamma: 0.5
