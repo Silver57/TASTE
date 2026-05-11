@@ -43,3 +43,6 @@ ipo_beta: 0.1
 kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
+
+# In-context learning
+icl_max_seq_len: 1024

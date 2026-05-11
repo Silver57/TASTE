@@ -1,9 +1,10 @@
-"""Custom alignment trainers: DPO, IPO, SimPO, KTO."""
+"""Custom alignment trainers: DPO, IPO, SimPO, KTO, ICL."""
 
 import random
 
 import torch
 import torch.nn.functional as F
+from datasets import Dataset
 from peft import get_peft_model
 
 from .logprobs import forward_completion_logprobs
@@ -24,7 +25,11 @@ class _BaseTrainer:
         self.bs = batch_size
         self.max_gn = max_grad_norm
         self.max_seq_len = max_seq_len
+        self.eval_max_length = max_seq_len
         self.seed = random_seed
+
+    def eval_dataset(self, ev_ds):
+        return ev_ds
 
     def _compute_loss(self, batch, idx):
         raise NotImplementedError
@@ -142,10 +147,65 @@ class KTOTrainerCustom(_BaseTrainer):
         return (labels * pos_loss + (1.0 - labels) * neg_loss).mean()
 
 
+class ICLTrainer(_BaseTrainer):
+    """No-train baseline: frozen base model conditioned on n in-prompt demos.
+
+    Training pairs are rendered as demonstrations and prepended to each eval
+    prompt. Scoring then reuses `forward_completion_logprobs` unchanged.
+    """
+
+    def __init__(self, model, tokenizer, dataset, peft_config=None,
+                 icl_max_seq_len=2048, **kw):
+        super().__init__(
+            model=model, tokenizer=tokenizer, dataset=dataset,
+            peft_config=None, **kw,
+        )
+        self.eval_max_length = icl_max_seq_len
+        self.demos = list(dataset)
+
+    def train(self):
+        pass
+
+    def assemble_prompt(self, eval_prompt: str) -> str:
+        raise NotImplementedError
+
+    def eval_dataset(self, ev_ds):
+        rows = [
+            {**r, "prompt": self.assemble_prompt(r["prompt"])}
+            for r in ev_ds
+        ]
+        return Dataset.from_list(rows)
+
+
+class ICLFlatTrainer(ICLTrainer):
+    """Flat-text demos: `<prompt> <chosen>` blocks separated by blank lines."""
+
+    def assemble_prompt(self, eval_prompt: str) -> str:
+        blocks = [f"{d['prompt']} {d['chosen']}" for d in self.demos]
+        blocks.append(eval_prompt)
+        return "\n\n".join(blocks)
+
+
+class ICLChatTrainer(ICLTrainer):
+    """Chat-templated demos using the tokenizer's chat template (Llama-3)."""
+
+    def assemble_prompt(self, eval_prompt: str) -> str:
+        messages = []
+        for d in self.demos:
+            messages.append({"role": "user", "content": d["prompt"]})
+            messages.append({"role": "assistant", "content": d["chosen"]})
+        messages.append({"role": "user", "content": eval_prompt})
+        return self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+        )
+
+
 # Registry for the sweep loop
 TRAINER_REGISTRY = {
     "dpo": DPOTrainerCustom,
     "ipo": IPOTrainerCustom,
     "simpo": SimPOTrainerCustom,
     "kto": KTOTrainerCustom,
+    "icl_flat": ICLFlatTrainer,
+    "icl_chat": ICLChatTrainer,
 }

@@ -201,7 +201,7 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
 
     # ── Sweep ─────────────────────────────────────────────────────────────────
     t0 = time.time()
-    methods = ["base", "dpo", "ipo", "simpo", "kto"]
+    methods = ["base", "dpo", "ipo", "simpo", "kto", "icl_flat", "icl_chat"]
     results = {m: defaultdict(list) for m in methods}
 
     # Base model
@@ -237,6 +237,7 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
             free_memory()
             print("done")
 
+            icl_max_seq_len = cfg.get("icl_max_seq_len", 2048)
             method_specs = [
                 ("dpo", dict(ref_chosen_lps=ref_c, ref_rejected_lps=ref_r,
                              beta=cfg["dpo_beta"]),
@@ -248,6 +249,10 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
                  tr_d, ev_d, False),
                 ("kto", dict(ref_lps=ref_k, beta=cfg["kto_beta"]),
                  tr_k, ev_k, True),
+                ("icl_flat", dict(icl_max_seq_len=icl_max_seq_len),
+                 tr_d, ev_d, False),
+                ("icl_chat", dict(icl_max_seq_len=icl_max_seq_len),
+                 tr_d, ev_d, False),
             ]
 
             for method, mkw, ds, ev_ds, kto_flag in method_specs:
@@ -263,8 +268,8 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
                 )
                 t.train()
                 acc = preference_accuracy(
-                    t.model, tokenizer, ev_ds,
-                    is_kto=kto_flag, max_length=cfg["max_seq_len"],
+                    t.model, tokenizer, t.eval_dataset(ev_ds),
+                    is_kto=kto_flag, max_length=t.eval_max_length,
                 )
                 results[method][n].append(acc)
                 print(f"acc={acc:.3f}  ({gpu_mb():.0f} MB)")

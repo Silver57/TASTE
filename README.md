@@ -1,8 +1,11 @@
 # Cold-Start Preference Learning — Master's Thesis
 
 Compares DPO, IPO, SimPO, and KTO for personalised cold-start recommendation
-using LoRA-adapted LLMs. Evaluates how quickly each alignment method recovers
-user preferences from minimal interaction data.
+using LoRA-adapted LLMs, plus an in-context-learning baseline (`icl_flat` and
+`icl_chat`) that pastes the n training pairs into the prompt and scores with
+the frozen base model. Evaluates how quickly each alignment method recovers
+user preferences from minimal interaction data, and whether training is worth
+it at small n.
 
 ## Project layout
 
@@ -117,9 +120,16 @@ smoke config.
 
 ## Adding a new alignment method
 
-1. Subclass `_BaseTrainer` in `src/trainers.py`.
-2. Add the method name to the `METHODS` list in `scripts/run_sweep.py`.
-3. That's it — the sweep loop picks it up automatically.
+1. Subclass `_BaseTrainer` in `src/trainers.py` and register it in
+   `TRAINER_REGISTRY`.
+2. Add the method name to the `methods` list in `scripts/run_sweep.py` and
+   append a tuple to `method_specs` with the trainer's kwargs, training set,
+   eval set, and KTO flag.
+3. For no-train methods (e.g. ICL), override `eval_dataset(self, ev_ds)` to
+   transform the eval rows and set `self.eval_max_length` to a per-method
+   sequence-length cap. The sweep loop calls these hooks for every method.
+4. Add a `STYLES` entry in `scripts/plot_results.py` so the curve shows up in
+   figures.
 
 ## Configs
 

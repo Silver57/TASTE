@@ -31,11 +31,13 @@ from src.evaluate import compute_summary
 
 
 STYLES = {
-    "base":  dict(color="gray",       linestyle="--", marker=""),
-    "dpo":   dict(color="steelblue",  linestyle="-",  marker="o"),
-    "ipo":   dict(color="darkorange", linestyle="-",  marker="s"),
-    "simpo": dict(color="seagreen",   linestyle="-",  marker="^"),
-    "kto":   dict(color="orchid",     linestyle="-",  marker="D"),
+    "base":     dict(color="gray",         linestyle="--", marker=""),
+    "dpo":      dict(color="steelblue",    linestyle="-",  marker="o"),
+    "ipo":      dict(color="darkorange",   linestyle="-",  marker="s"),
+    "simpo":    dict(color="seagreen",     linestyle="-",  marker="^"),
+    "kto":      dict(color="orchid",       linestyle="-",  marker="D"),
+    "icl_flat": dict(color="crimson",      linestyle=":",  marker="*"),
+    "icl_chat": dict(color="mediumpurple", linestyle=":",  marker="X"),
 }
 
 # Extra linestyles cycled across prompt variants in the ablation comparison plot
