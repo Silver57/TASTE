@@ -218,6 +218,11 @@ def main():
         files = sorted(rdir.glob("results*.json"))
         if not files:
             parser.error(f"No results*.json found in {rdir}")
+        # If ablation files exist (results_<name>.json), drop the plain
+        # results.json to avoid a duplicate "default" vs the real variant.
+        ablation_files = [f for f in files if f.name != "results.json"]
+        if ablation_files:
+            files = ablation_files
     elif args.results:
         files = [Path(p) for p in args.results]
     else:
