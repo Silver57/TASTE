@@ -22,7 +22,7 @@ random_seeds: [42, 99]
 
 num_train_epochs: 3
 batch_size: 4
-learning_rate: 5.0e-4
+learning_rate: 5e-5
 max_grad_norm: 1.0
 max_seq_len: 256
 
@@ -37,4 +37,4 @@ kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-icl_max_seq_len: 1024
+icl_max_seq_len: 2048

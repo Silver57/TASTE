@@ -39,4 +39,4 @@ kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-icl_max_seq_len: 4096
+icl_max_seq_len: 6144
