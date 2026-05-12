@@ -4,7 +4,7 @@ data_dir: data/raw/Netflix
 output_dir: outputs/netflix
 pair_dir: data/netflix_pairs
 
-min_reviews_per_movie: 20000
+min_reviews_per_movie: 2000
 
 n_users: 35
 pairs_per_user: 100

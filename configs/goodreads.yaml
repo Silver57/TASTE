@@ -4,7 +4,7 @@ data_dir: data/raw/GoodReads
 output_dir: outputs/goodreads
 pair_dir: data/goodreads_pairs
 
-min_reviews_per_book: 20000
+min_reviews_per_book: 2000
 
 n_users: 35
 pairs_per_user: 100

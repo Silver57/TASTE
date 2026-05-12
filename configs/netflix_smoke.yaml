@@ -1,48 +1,40 @@
-# configs/netflix_smoke.yaml — Minimal Netflix config for local smoke testing
 dataset: netflix
 data_dir: data/raw/Netflix
 output_dir: outputs/netflix_smoke
 pair_dir: data/netflix_smoke_pairs
 
-min_reviews_per_movie: 500
+min_reviews_per_movie: 20000
 
-# Pair generation — tiny
-n_users: 3
-pairs_per_user: 15
+n_users: 5
+pairs_per_user: 40
 prompt_templates:
   simple: "Which movie does the client prefer: {title_a} or {title_b}?"
   detailed: "Given these two movies, which one would the viewer enjoy more? Movie A: {title_a}. Movie B: {title_b}. The viewer prefers:"
   system: "You are a movie recommendation assistant. A viewer is choosing between {title_a} and {title_b}. Which do they prefer?"
 default_prompt: simple
 
-# Model
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-# Cold-start sweep — minimal
-cold_start_sizes: [3]
-eval_pairs_per_user: 5
-n_eval_users: 2
-random_seeds: [42]
+cold_start_sizes: [20]
+eval_pairs_per_user: 15
+n_eval_users: 3
+random_seeds: [42, 99]
 
-# Training — fast
-num_train_epochs: 1
-batch_size: 2
-learning_rate: 2.0e-5
+num_train_epochs: 3
+batch_size: 4
+learning_rate: 5.0e-4
 max_grad_norm: 1.0
-max_seq_len: 128
+max_seq_len: 256
 
-# LoRA — small
-lora_r: 4
-lora_alpha: 8
-lora_target_modules: ["q_proj", "v_proj"]
+lora_r: 16
+lora_alpha: 32
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 lora_dropout: 0.05
 
-# Loss hyperparameters
 dpo_beta: 0.1
 ipo_beta: 0.1
 kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-# In-context learning
 icl_max_seq_len: 1024

@@ -1,48 +1,52 @@
-# configs/goodreads_smoke.yaml — Minimal GoodReads config for local smoke testing
+# configs/goodreads_smoke.yaml — A100 smoke test
+# Goal: validate all 7 methods produce distinguishable results on real model
+# Target runtime: ~5 min on A100 80GB
 dataset: goodreads
 data_dir: data/raw/GoodReads
 output_dir: outputs/goodreads_smoke
 pair_dir: data/goodreads_smoke_pairs
 
-min_reviews_per_book: 500
+min_reviews_per_book: 2000
 
-# Pair generation — tiny
-n_users: 3
-pairs_per_user: 15
+# Pair generation — small but realistic
+n_users: 5
+pairs_per_user: 40
 prompt_templates:
   simple: "Which book does the reader prefer: {title_a} or {title_b}?"
   detailed: "Given these two books, which one would the reader enjoy more? Book A: {title_a}. Book B: {title_b}. The reader prefers:"
   system: "You are a book recommendation assistant. A reader is choosing between {title_a} and {title_b}. Which do they prefer?"
 default_prompt: simple
 
-# Model
+# Real model — critical: this is what catches GPU-specific bugs
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-# Cold-start sweep — minimal
-cold_start_sizes: [3]
-eval_pairs_per_user: 5
-n_eval_users: 2
-random_seeds: [42]
+# Single cold-start size, but large enough to actually train
+cold_start_sizes: [20]
+eval_pairs_per_user: 15
+n_eval_users: 3
 
-# Training — fast
-num_train_epochs: 1
-batch_size: 2
-learning_rate: 2.0e-5
+# Two seeds — exercises multi-seed code path without doubling cost
+random_seeds: [42, 99]
+
+# Training — meaningful signal in minimum time
+num_train_epochs: 3
+batch_size: 4
+learning_rate: 5.0e-4          # 25x the real config's lr — forces visible divergence
 max_grad_norm: 1.0
-max_seq_len: 128
+max_seq_len: 256               # shorter than real (512) for speed
 
-# LoRA — small
-lora_r: 4
-lora_alpha: 8
-lora_target_modules: ["q_proj", "v_proj"]
+# LoRA — matches real config so smoke is representative
+lora_r: 16
+lora_alpha: 32
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 lora_dropout: 0.05
 
-# Loss hyperparameters
+# Loss hyperparameters — same as real
 dpo_beta: 0.1
 ipo_beta: 0.1
 kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-# In-context learning
+# ICL — short to keep smoke fast
 icl_max_seq_len: 1024
