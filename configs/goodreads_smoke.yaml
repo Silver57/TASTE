@@ -31,7 +31,7 @@ random_seeds: [42, 99]
 # Training — meaningful signal in minimum time
 num_train_epochs: 3
 batch_size: 4
-learning_rate: 5e-5          # 25x the real config's lr — forces visible divergence
+learning_rate: 5.0e-05         # 25x the real config's lr — forces visible divergence
 max_grad_norm: 1.0
 max_seq_len: 256               # shorter than real (512) for speed
 
