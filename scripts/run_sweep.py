@@ -127,7 +127,9 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
     SIZES = cfg["cold_start_sizes"]
     N_EVAL = cfg["n_eval_users"]
     EVAL_PAIRS = cfg["eval_pairs_per_user"]
-    SEED = cfg["random_seed"]
+    # Backward-compat: accept either random_seeds (list) or random_seed (scalar).
+    seeds = cfg.get("random_seeds", [cfg.get("random_seed", 42)])
+    SEED = seeds[0]  # used only for user-selection RNG (must be stable across seeds)
     MODEL_ID = cfg["model_id"]
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -138,6 +140,7 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
 
     print(f"Device: {DEVICE}  |  dtype: {TORCH_DTYPE}")
     print(f"Sizes: {SIZES}  |  Users: {N_EVAL}  |  Epochs: {cfg['num_train_epochs']}")
+    print(f"Seeds: {seeds}")
 
     random.seed(SEED)
     torch.manual_seed(SEED)
@@ -149,15 +152,6 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
         lora_dropout=cfg["lora_dropout"],
         bias="none",
         task_type=TaskType.CAUSAL_LM,
-    )
-
-    train_kw = dict(
-        learning_rate=cfg["learning_rate"],
-        num_train_epochs=cfg["num_train_epochs"],
-        batch_size=cfg["batch_size"],
-        max_grad_norm=cfg["max_grad_norm"],
-        max_seq_len=cfg["max_seq_len"],
-        random_seed=SEED,
     )
 
     # ── Load preference data ──────────────────────────────────────────────────
@@ -186,8 +180,6 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
     eval_users = eligible[:N_EVAL]
     print(f"  Eval users: {eval_users}")
 
-    splitter = UserSplitter(dpo_by_user, kto_by_user, EVAL_PAIRS, SEED)
-
     # ── Tokenizer ─────────────────────────────────────────────────────────────
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
     if tokenizer.pad_token is None:
@@ -202,91 +194,119 @@ def run_sweep(cfg, pair_dir: Path, out_dir: Path, prompt_name: str | None = None
     # ── Sweep ─────────────────────────────────────────────────────────────────
     t0 = time.time()
     methods = ["base", "dpo", "ipo", "simpo", "kto", "icl_flat", "icl_chat"]
-    results = {m: defaultdict(list) for m in methods}
+    # results[method][n][seed] = list[per-user accuracy]
+    results = {m: defaultdict(lambda: defaultdict(list)) for m in methods}
 
-    # Base model
+    # Base model — frozen, deterministic forward pass. Run once on the first
+    # seed's splits and replicate across all seeds.
     print(f"\n{'─' * 50}")
-    print("Evaluating BASE model …")
+    print("Evaluating BASE model (once, replicated across seeds) …")
+    base_splitter = UserSplitter(dpo_by_user, kto_by_user, EVAL_PAIRS, seeds[0])
     bm = load_model()
+    base_user_accs = {}
     for user in eval_users:
-        _, ev, _, _ = splitter.get(user, SIZES[0])
+        _, ev, _, _ = base_splitter.get(user, SIZES[0])
         acc = preference_accuracy(bm, tokenizer, ev, max_length=cfg["max_seq_len"])
-        for nv in SIZES:
-            results["base"][nv].append(acc)
+        base_user_accs[user] = acc
         print(f"  User {user}: {acc:.3f}")
     del bm
     free_memory()
+    for seed in seeds:
+        for user in eval_users:
+            for nv in SIZES:
+                results["base"][nv][seed].append(base_user_accs[user])
 
-    # Per-user training
-    run_ctr = 0
-    for ui, user in enumerate(eval_users):
-        print(f"\n{'═' * 50}")
-        print(f"  User {ui + 1}/{N_EVAL}: {user}")
-        print(f"{'═' * 50}")
+    # Per-seed, per-user training
+    for si, seed in enumerate(seeds):
+        print(f"\n{'#' * 50}")
+        print(f"  SEED {si + 1}/{len(seeds)}: {seed}")
+        print(f"{'#' * 50}")
 
-        for n in SIZES:
-            tr_d, ev_d, tr_k, ev_k = splitter.get(user, n)
-            print(f"\n  n={n}  ({len(tr_d)} DPO, {len(tr_k)} KTO rows)")
+        splitter = UserSplitter(dpo_by_user, kto_by_user, EVAL_PAIRS, seed)
+        train_kw = dict(
+            learning_rate=cfg["learning_rate"],
+            num_train_epochs=cfg["num_train_epochs"],
+            batch_size=cfg["batch_size"],
+            max_grad_norm=cfg["max_grad_norm"],
+            max_seq_len=cfg["max_seq_len"],
+            random_seed=seed,
+        )
 
-            # Reference log-probs
-            print("    ref …", end=" ", flush=True)
-            rm = load_model()
-            ref_c, ref_r = precompute_dpo_ref(rm, tokenizer, tr_d, cfg["max_seq_len"])
-            ref_k = precompute_kto_ref(rm, tokenizer, tr_k, cfg["max_seq_len"])
-            del rm
-            free_memory()
-            print("done")
+        run_ctr = 0
+        for ui, user in enumerate(eval_users):
+            print(f"\n{'═' * 50}")
+            print(f"  Seed {seed}  |  User {ui + 1}/{N_EVAL}: {user}")
+            print(f"{'═' * 50}")
 
-            icl_max_seq_len = cfg.get("icl_max_seq_len", 2048)
-            method_specs = [
-                ("dpo", dict(ref_chosen_lps=ref_c, ref_rejected_lps=ref_r,
-                             beta=cfg["dpo_beta"]),
-                 tr_d, ev_d, False),
-                ("ipo", dict(ref_chosen_lps=ref_c, ref_rejected_lps=ref_r,
-                             beta=cfg["ipo_beta"]),
-                 tr_d, ev_d, False),
-                ("simpo", dict(beta=cfg["simpo_beta"], gamma=cfg["simpo_gamma"]),
-                 tr_d, ev_d, False),
-                ("kto", dict(ref_lps=ref_k, beta=cfg["kto_beta"]),
-                 tr_k, ev_k, True),
-                ("icl_flat", dict(icl_max_seq_len=icl_max_seq_len),
-                 tr_d, ev_d, False),
-                ("icl_chat", dict(icl_max_seq_len=icl_max_seq_len),
-                 tr_d, ev_d, False),
-            ]
+            for n in SIZES:
+                tr_d, ev_d, tr_k, ev_k = splitter.get(user, n)
+                print(f"\n  n={n}  ({len(tr_d)} DPO, {len(tr_k)} KTO rows)")
 
-            for method, mkw, ds, ev_ds, kto_flag in method_specs:
-                run_ctr += 1
-                reset_seeds(SEED, run_ctr)
-                print(f"    {method.upper():>5} …", end=" ", flush=True)
-
-                m = load_model()
-                TrainerCls = TRAINER_REGISTRY[method]
-                t = TrainerCls(
-                    **mkw, model=m, tokenizer=tokenizer,
-                    dataset=ds, peft_config=lora_cfg, **train_kw,
-                )
-                t.train()
-                acc = preference_accuracy(
-                    t.model, tokenizer, t.eval_dataset(ev_ds),
-                    is_kto=kto_flag, max_length=t.eval_max_length,
-                )
-                results[method][n].append(acc)
-                print(f"acc={acc:.3f}  ({gpu_mb():.0f} MB)")
-                del t, m
+                # Reference log-probs
+                print("    ref …", end=" ", flush=True)
+                rm = load_model()
+                ref_c, ref_r = precompute_dpo_ref(rm, tokenizer, tr_d, cfg["max_seq_len"])
+                ref_k = precompute_kto_ref(rm, tokenizer, tr_k, cfg["max_seq_len"])
+                del rm
                 free_memory()
+                print("done")
 
-            del ref_c, ref_r, ref_k
+                icl_max_seq_len = cfg.get("icl_max_seq_len", 2048)
+                method_specs = [
+                    ("dpo", dict(ref_chosen_lps=ref_c, ref_rejected_lps=ref_r,
+                                 beta=cfg["dpo_beta"]),
+                     tr_d, ev_d, False),
+                    ("ipo", dict(ref_chosen_lps=ref_c, ref_rejected_lps=ref_r,
+                                 beta=cfg["ipo_beta"]),
+                     tr_d, ev_d, False),
+                    ("simpo", dict(beta=cfg["simpo_beta"], gamma=cfg["simpo_gamma"]),
+                     tr_d, ev_d, False),
+                    ("kto", dict(ref_lps=ref_k, beta=cfg["kto_beta"]),
+                     tr_k, ev_k, True),
+                    ("icl_flat", dict(icl_max_seq_len=icl_max_seq_len),
+                     tr_d, ev_d, False),
+                    ("icl_chat", dict(icl_max_seq_len=icl_max_seq_len),
+                     tr_d, ev_d, False),
+                ]
+
+                for method, mkw, ds, ev_ds, kto_flag in method_specs:
+                    run_ctr += 1
+                    reset_seeds(seed, run_ctr)
+                    print(f"    {method.upper():>5} …", end=" ", flush=True)
+
+                    m = load_model()
+                    TrainerCls = TRAINER_REGISTRY[method]
+                    t = TrainerCls(
+                        **mkw, model=m, tokenizer=tokenizer,
+                        dataset=ds, peft_config=lora_cfg, **train_kw,
+                    )
+                    t.train()
+                    acc = preference_accuracy(
+                        t.model, tokenizer, t.eval_dataset(ev_ds),
+                        is_kto=kto_flag, max_length=t.eval_max_length,
+                    )
+                    results[method][n][seed].append(acc)
+                    print(f"acc={acc:.3f}  ({gpu_mb():.0f} MB)")
+                    del t, m
+                    free_memory()
+
+                del ref_c, ref_r, ref_k
 
     elapsed = time.time() - t0
 
     # ── Save raw results ──────────────────────────────────────────────────────
+    serializable_results = {
+        m: {nv: dict(by_seed) for nv, by_seed in results[m].items()}
+        for m in results
+    }
     save_data = {
         "config": cfg,
         "prompt_name": prompt_name,
         "eval_users": eval_users,
-        "results": {m: dict(results[m]) for m in results},
+        "seeds": seeds,
+        "results": serializable_results,
         "elapsed_minutes": elapsed / 60,
+        "version": 2,
     }
     suffix = f"_{prompt_name}" if prompt_name else ""
     results_path = out_dir / f"results{suffix}.json"

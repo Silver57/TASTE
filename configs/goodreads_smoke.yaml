@@ -22,7 +22,7 @@ model_id: meta-llama/Meta-Llama-3-8B-Instruct
 cold_start_sizes: [3]
 eval_pairs_per_user: 5
 n_eval_users: 2
-random_seed: 42
+random_seeds: [42]
 
 # Training — fast
 num_train_epochs: 1

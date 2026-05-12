@@ -34,13 +34,34 @@ def preference_accuracy(model, tok, eval_dataset, is_kto=False, max_length=256):
     return (c > r).sum().item() / len(prompts)
 
 
+def seed_averaged(results):
+    """Reduce results[method][n] cells to per-user lists.
+
+    Accepts either the old shape (results[method][n] = list[per-user acc])
+    or the new shape (results[method][n][seed] = list[per-user acc]). In the
+    new shape, each user's accuracies are averaged across seeds first, keeping
+    "user" as the unit of analysis.
+    """
+    out = {}
+    for method, by_n in results.items():
+        out[method] = {}
+        for n, cell in by_n.items():
+            if isinstance(cell, dict):
+                arr = np.array([cell[s] for s in cell])
+                out[method][n] = arr.mean(axis=0).tolist()
+            else:
+                out[method][n] = list(cell)
+    return out
+
+
 def compute_summary(results: dict, cold_start_sizes: list):
-    """Compute mean ± SE from per-user results dict."""
+    """Compute mean ± SE across users (seed-averaged per user if multi-seed)."""
+    normalized = seed_averaged(results)
     mean_res, se_res = {}, {}
-    for method in results:
+    for method in normalized:
         ms, ss = [], []
         for nv in cold_start_sizes:
-            v = np.array(results[method][nv])
+            v = np.array(normalized[method][nv])
             ms.append(v.mean())
             ss.append(v.std(ddof=1) / np.sqrt(len(v)) if len(v) > 1 else 0.0)
         mean_res[method] = ms
@@ -59,14 +80,20 @@ def print_results_table(mean_res, se_res, cold_start_sizes):
 
 
 def run_wilcoxon_tests(results, cold_start_sizes, methods=None):
-    """Run pairwise Wilcoxon signed-rank tests at the largest n."""
+    """Pairwise Wilcoxon signed-rank tests at the largest n.
+
+    With multi-seed results, users are paired by their seed-averaged accuracy
+    so that user (not user×seed) is the unit of analysis.
+    """
     from scipy.stats import wilcoxon
 
+    normalized = seed_averaged(results)
+
     if methods is None:
-        methods = [m for m in results if m != "base"]
+        methods = [m for m in normalized if m != "base"]
     largest = cold_start_sizes[-1]
 
-    n_users = len(results[methods[0]][largest])
+    n_users = len(normalized[methods[0]][largest])
     if n_users < 5:
         print(f"  (Skipping significance tests — only {n_users} users)")
         return
@@ -74,8 +101,8 @@ def run_wilcoxon_tests(results, cold_start_sizes, methods=None):
     print(f"\nWilcoxon tests at n={largest} ({n_users} users):")
     for i, m1 in enumerate(methods):
         for m2 in methods[i + 1 :]:
-            a = np.array(results[m1][largest])
-            b = np.array(results[m2][largest])
+            a = np.array(normalized[m1][largest])
+            b = np.array(normalized[m2][largest])
             d = a - b
             if np.all(d == 0):
                 print(f"  {m1.upper()} vs {m2.upper()}: identical")

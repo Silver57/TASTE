@@ -6,43 +6,37 @@ pair_dir: data/goodreads_pairs
 
 min_reviews_per_book: 20000
 
-# Pair generation
-n_users: 10
-pairs_per_user: 40
+n_users: 35
+pairs_per_user: 100
 prompt_templates:
   simple: "Which book does the reader prefer: {title_a} or {title_b}?"
   detailed: "Given these two books, which one would the reader enjoy more? Book A: {title_a}. Book B: {title_b}. The reader prefers:"
   system: "You are a book recommendation assistant. A reader is choosing between {title_a} and {title_b}. Which do they prefer?"
 default_prompt: simple
 
-# Model
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-# Cold-start sweep
-cold_start_sizes: [3, 5, 10]
-eval_pairs_per_user: 10
-n_eval_users: 3
-random_seed: 42
+cold_start_sizes: [3, 5, 10, 50]
+eval_pairs_per_user: 30
+n_eval_users: 22
 
-# Training
-num_train_epochs: 1
-batch_size: 2
+random_seeds: [42, 123]
+
+num_train_epochs: 3
+batch_size: 4
 learning_rate: 2.0e-5
 max_grad_norm: 1.0
-max_seq_len: 256
+max_seq_len: 512
 
-# LoRA
-lora_r: 8
-lora_alpha: 16
-lora_target_modules: ["q_proj", "v_proj"]
+lora_r: 16
+lora_alpha: 32
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 lora_dropout: 0.05
 
-# Loss hyperparameters
 dpo_beta: 0.1
 ipo_beta: 0.1
 kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-# In-context learning
-icl_max_seq_len: 2048
+icl_max_seq_len: 4096

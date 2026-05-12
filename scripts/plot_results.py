@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from src.evaluate import compute_summary
+from src.evaluate import compute_summary, seed_averaged
 
 
 STYLES = {
@@ -50,7 +50,9 @@ def load_result(path: str) -> dict:
 
 
 def _fix_keys(results: dict) -> dict:
-    """Convert string keys back to ints."""
+    """Convert string n-keys back to ints. Inner cell is either a list (old
+    single-seed shape) or a dict[seed_str -> list] (new multi-seed shape);
+    downstream helpers (compute_summary, seed_averaged) handle both."""
     return {m: {int(k): v for k, v in results[m].items()} for m in results}
 
 
@@ -64,6 +66,7 @@ def plot_single(data: dict, out_dir: Path):
     prompt_label = data.get("prompt_name") or ""
 
     mean_res, se_res = compute_summary(results, sizes)
+    per_user = seed_averaged(results)  # per-user (seed-averaged) view for subplots
 
     # Main plot
     fig, ax = plt.subplots(figsize=(9, 5))
@@ -108,7 +111,7 @@ def plot_single(data: dict, out_dir: Path):
                 continue
             ax.plot(
                 sizes,
-                [results[name][nv][i] for nv in sizes],
+                [per_user[name][nv][i] for nv in sizes],
                 label=name.upper(),
                 **STYLES[name],
             )
