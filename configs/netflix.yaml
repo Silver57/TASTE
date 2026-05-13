@@ -7,7 +7,7 @@ pair_dir: data/netflix_pairs
 min_reviews_per_movie: 2000
 
 n_users: 35
-pairs_per_user: 100
+pairs_per_user: 150
 prompt_templates:
   simple: "Which movie does the client prefer: {title_a} or {title_b}?"
   detailed: "Given these two movies, which one would the viewer enjoy more? Movie A: {title_a}. Movie B: {title_b}. The viewer prefers:"
@@ -16,7 +16,7 @@ default_prompt: simple
 
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-cold_start_sizes: [3, 5, 10, 50]
+cold_start_sizes: [100]
 eval_pairs_per_user: 30
 n_eval_users: 22
 
