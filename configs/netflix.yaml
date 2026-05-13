@@ -1,12 +1,12 @@
-# configs/netflix.yaml — Netflix cold-start experiment
+# configs/netflix.yaml — full sweep with crossover detection
 dataset: netflix
 data_dir: data/raw/Netflix
 output_dir: outputs/netflix
 pair_dir: data/netflix_pairs
 
-min_reviews_per_movie: 2000
+min_reviews_per_movie: 20000
 
-n_users: 35
+n_users: 40
 pairs_per_user: 150
 prompt_templates:
   simple: "Which movie does the client prefer: {title_a} or {title_b}?"
@@ -16,7 +16,7 @@ default_prompt: simple
 
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-cold_start_sizes: [100]
+cold_start_sizes: [3, 5, 10, 50, 75, 100]
 eval_pairs_per_user: 30
 n_eval_users: 22
 
@@ -24,7 +24,7 @@ random_seeds: [42, 123]
 
 num_train_epochs: 3
 batch_size: 4
-learning_rate: 2.0e-5
+learning_rate: 0.00002
 max_grad_norm: 1.0
 max_seq_len: 512
 
@@ -39,4 +39,4 @@ kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-icl_max_seq_len: 6144
+icl_max_seq_len: 8192

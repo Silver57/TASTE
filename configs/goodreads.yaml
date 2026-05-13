@@ -1,12 +1,13 @@
-# configs/goodreads.yaml — GoodReads cold-start experiment
+# configs/goodreads.yaml — full sweep with crossover detection
 dataset: goodreads
 data_dir: data/raw/GoodReads
 output_dir: outputs/goodreads
 pair_dir: data/goodreads_pairs
 
-min_reviews_per_book: 2000
+min_reviews_per_book: 20000
 
-n_users: 35
+# Pair generation — n=100 train + 30 eval + buffer
+n_users: 40
 pairs_per_user: 150
 prompt_templates:
   simple: "Which book does the reader prefer: {title_a} or {title_b}?"
@@ -16,27 +17,33 @@ default_prompt: simple
 
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
-cold_start_sizes: [100]
+# Cold-start sweep — extended to find crossover
+cold_start_sizes: [3, 5, 10, 50, 75, 100]
 eval_pairs_per_user: 30
 n_eval_users: 22
 
+# Multi-seed for variance estimation
 random_seeds: [42, 123]
 
+# Training (LR 2e-5 — matches your existing runs, no confound)
 num_train_epochs: 3
 batch_size: 4
-learning_rate: 2.0e-5
+learning_rate: 0.00002
 max_grad_norm: 1.0
 max_seq_len: 512
 
+# LoRA
 lora_r: 16
 lora_alpha: 32
 lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 lora_dropout: 0.05
 
+# Loss hyperparameters
 dpo_beta: 0.1
 ipo_beta: 0.1
 kto_beta: 0.1
 simpo_beta: 2.0
 simpo_gamma: 0.5
 
-icl_max_seq_len: 6144
+# ICL — bumped to 8192 to prevent the n=100 truncation outlier (user 11257)
+icl_max_seq_len: 8192
