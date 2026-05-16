@@ -4,7 +4,7 @@ data_dir: data/raw/GoodReads
 output_dir: outputs/goodreads_extended
 pair_dir: data/goodreads_extended_pairs
 
-min_reviews_per_book: 20000
+min_reviews_per_book: 2000
 
 # Pair generation — n=100 train + 30 eval + buffer
 n_users: 40
