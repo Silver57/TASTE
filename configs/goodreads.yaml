@@ -1,14 +1,14 @@
 # configs/goodreads.yaml — full sweep with crossover detection
 dataset: goodreads
 data_dir: data/raw/GoodReads
-output_dir: outputs/goodreads
-pair_dir: data/goodreads_pairs
+output_dir: outputs/goodreads_extended
+pair_dir: data/goodreads_extended_pairs
 
 min_reviews_per_book: 20000
 
 # Pair generation — n=100 train + 30 eval + buffer
 n_users: 40
-pairs_per_user: 150
+pairs_per_user: 240
 prompt_templates:
   simple: "Which book does the reader prefer: {title_a} or {title_b}?"
   detailed: "Given these two books, which one would the reader enjoy more? Book A: {title_a}. Book B: {title_b}. The reader prefers:"
@@ -18,7 +18,7 @@ default_prompt: simple
 model_id: meta-llama/Meta-Llama-3-8B-Instruct
 
 # Cold-start sweep — extended to find crossover
-cold_start_sizes: [3, 5, 10, 50, 75, 100]
+cold_start_sizes: [150, 200]
 eval_pairs_per_user: 30
 n_eval_users: 22
 
