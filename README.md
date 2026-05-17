@@ -53,7 +53,7 @@ python scripts/prepare_data.py --config configs/goodreads.yaml
 python scripts/run_sweep.py --config configs/goodreads.yaml
 
 # 5. Plot results
-python scripts/plot_results.py --results outputs/goodreads/results.json
+python scripts/plot_results.py --results outputs/goodreads/1results.json
 ```
 
 ## Prompt template ablation

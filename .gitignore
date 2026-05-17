@@ -155,7 +155,7 @@ cython_debug/
 
 # Project specific
 data/
-outputs/
+old_results/outputs/
 logs/
 *.csv
 *.png
