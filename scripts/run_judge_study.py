@@ -58,7 +58,34 @@ def parse_approved(text: str) -> tuple[str, str]:
 
 
 _STOPWORDS = {"the", "and", "for", "with", "from", "this", "that",
-              "into", "her", "his", "one", "two"}
+              "into", "her", "his", "one", "two", "but", "not", "all"}
+
+_PAREN_TAIL_RE = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _title_variants(title: str) -> list[str]:
+    """Title plus its paren-stripped variant if different.
+
+    Llama-3 frequently abbreviates 'Foo (Series, #1)' to 'Foo' in prose, so
+    we search for both forms when locating a title in a recommendation.
+    """
+    stripped = _PAREN_TAIL_RE.sub("", title).strip()
+    if stripped and stripped != title:
+        return [title, stripped]
+    return [title]
+
+
+def _earliest_match(text_l: str, title: str) -> tuple[int, int]:
+    """First-hit index across a title's variants. Returns (idx, matched_len)
+    or (-1, 0) if no variant appears in text_l."""
+    best_idx = -1
+    best_len = 0
+    for v in _title_variants(title):
+        idx = text_l.find(v.lower())
+        if idx != -1 and (best_idx == -1 or idx < best_idx):
+            best_idx = idx
+            best_len = len(v)
+    return best_idx, best_len
 
 
 def _title_tokens(title: str) -> set[str]:
@@ -68,21 +95,24 @@ def _title_tokens(title: str) -> set[str]:
 def parse_choice(text: str, title_1: str, title_2: str) -> tuple[str | None, bool]:
     """Recover the candidate's pick from a free-form recommendation.
 
-    Phase 1 — case-insensitive exact-substring match. First-occurrence wins;
-    on equal indices (e.g. one title is a prefix of the other) the longer
-    title wins. Phase 2 — distinctive-token overlap with stopwords removed
-    and word-boundary regex so common substrings like "the" inside "neither"
-    cannot drive a false match. Returns (chosen_title, ambiguous).
+    Phase 1 — case-insensitive exact-substring match, trying both the full
+    title and its paren-stripped variant (e.g. 'Cinder (Lunar Chronicles,
+    #1)' → also 'Cinder'). First-occurrence wins; on equal indices, prefer
+    the longer matched variant. Phase 2 — distinctive-token overlap with
+    stopwords removed and word-boundary regex so common substrings like
+    'the' inside 'neither' can't drive a false match. Returns
+    (chosen_title, ambiguous); chosen_title is always the original title
+    string (matches gt_liked downstream).
     """
     text_l = text.lower()
-    i1 = text_l.find(title_1.lower())
-    i2 = text_l.find(title_2.lower())
+    i1, l1 = _earliest_match(text_l, title_1)
+    i2, l2 = _earliest_match(text_l, title_2)
     if i1 != -1 and i2 != -1:
         if i1 < i2:
             return title_1, False
         if i2 < i1:
             return title_2, False
-        return (title_1 if len(title_1) >= len(title_2) else title_2), False
+        return (title_1 if l1 >= l2 else title_2), False
     if i1 != -1:
         return title_1, False
     if i2 != -1:
@@ -458,16 +488,22 @@ def stage_summary(out_dir: Path) -> None:
         games_per_condition[cond_x] += 1
         games_per_condition[cond_y] += 1
 
-    # ── GT-alignment from the parsed-choice column in judge_generations.jsonl
+    # ── GT-alignment: re-parse `recommendation` with the current parse_choice
+    # so the summary always reflects the latest parser, even if a prior run
+    # persisted parsed_choice/ambiguous under a buggier version.
     gens = [json.loads(line) for line in open(out_dir / "judge_generations.jsonl")]
+    reparsed = []
+    for g in gens:
+        choice, ambiguous = parse_choice(g["recommendation"], g["title_a"], g["title_b"])
+        reparsed.append({**g, "parsed_choice": choice, "ambiguous": ambiguous})
     gt_alignment: dict = {}
     for c in CONDITIONS:
-        rows = [g for g in gens if g["condition"] == c]
+        rows = [g for g in reparsed if g["condition"] == c]
         n_total = len(rows)
-        n_ambiguous = sum(1 for g in rows if g.get("ambiguous"))
-        parsed_rows = [g for g in rows if not g.get("ambiguous")]
+        n_ambiguous = sum(1 for g in rows if g["ambiguous"])
+        parsed_rows = [g for g in rows if not g["ambiguous"]]
         n_parsed = len(parsed_rows)
-        n_aligned = sum(1 for g in parsed_rows if g.get("parsed_choice") == g["gt_liked"])
+        n_aligned = sum(1 for g in parsed_rows if g["parsed_choice"] == g["gt_liked"])
         if n_parsed:
             rate = n_aligned / n_parsed
             p_value = binomtest(n_aligned, n_parsed, 0.5, alternative="greater").pvalue

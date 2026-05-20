@@ -1,0 +1,26 @@
+{
+  "n_judgments": 150,
+  "n_errors": 0,
+  "per_matchup": {
+    "simpo_vs_icl_chat": {
+      "games": 50,
+      "wins_icl_chat": 26,
+      "wins_simpo": 24
+    },
+    "simpo_vs_base": {
+      "games": 50,
+      "wins_base": 19,
+      "wins_simpo": 31
+    },
+    "icl_chat_vs_base": {
+      "games": 50,
+      "wins_icl_chat": 27,
+      "wins_base": 23
+    }
+  },
+  "win_rate_overall": {
+    "simpo": 0.55,
+    "icl_chat": 0.53,
+    "base": 0.42
+  }
+}

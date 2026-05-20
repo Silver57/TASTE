@@ -1,0 +1,52 @@
+{
+  "n_judgments": 300,
+  "n_errors": 0,
+  "per_matchup": {
+    "simpo_vs_icl_chat": {
+      "games": 100,
+      "wins_icl_chat": 64,
+      "wins_simpo": 36
+    },
+    "simpo_vs_base": {
+      "games": 100,
+      "wins_simpo": 56,
+      "wins_base": 44
+    },
+    "icl_chat_vs_base": {
+      "games": 100,
+      "wins_icl_chat": 67,
+      "wins_base": 33
+    }
+  },
+  "win_rate_overall": {
+    "simpo": 0.46,
+    "icl_chat": 0.655,
+    "base": 0.385
+  },
+  "gt_alignment": {
+    "simpo": {
+      "n_total": 100,
+      "n_ambiguous": 0,
+      "n_parsed": 100,
+      "n_aligned": 59,
+      "rate": 0.59,
+      "p_value_one_sided": 0.044313040057033785
+    },
+    "icl_chat": {
+      "n_total": 100,
+      "n_ambiguous": 0,
+      "n_parsed": 100,
+      "n_aligned": 79,
+      "rate": 0.79,
+      "p_value_one_sided": 2.1686833167108188e-09
+    },
+    "base": {
+      "n_total": 100,
+      "n_ambiguous": 0,
+      "n_parsed": 100,
+      "n_aligned": 55,
+      "rate": 0.55,
+      "p_value_one_sided": 0.18410080866334802
+    }
+  }
+}
