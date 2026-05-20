@@ -29,6 +29,7 @@ from pathlib import Path
 import yaml
 import torch
 from peft import LoraConfig, TaskType
+from scipy.stats import binomtest
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -54,6 +55,50 @@ def parse_approved(text: str) -> tuple[str, str]:
     if not m:
         raise ValueError(f"Unparseable chosen text: {text!r}")
     return m.group(1).strip(), m.group(2).strip()
+
+
+_STOPWORDS = {"the", "and", "for", "with", "from", "this", "that",
+              "into", "her", "his", "one", "two"}
+
+
+def _title_tokens(title: str) -> set[str]:
+    return {t for t in re.findall(r"\w+", title.lower())} - _STOPWORDS
+
+
+def parse_choice(text: str, title_1: str, title_2: str) -> tuple[str | None, bool]:
+    """Recover the candidate's pick from a free-form recommendation.
+
+    Phase 1 — case-insensitive exact-substring match. First-occurrence wins;
+    on equal indices (e.g. one title is a prefix of the other) the longer
+    title wins. Phase 2 — distinctive-token overlap with stopwords removed
+    and word-boundary regex so common substrings like "the" inside "neither"
+    cannot drive a false match. Returns (chosen_title, ambiguous).
+    """
+    text_l = text.lower()
+    i1 = text_l.find(title_1.lower())
+    i2 = text_l.find(title_2.lower())
+    if i1 != -1 and i2 != -1:
+        if i1 < i2:
+            return title_1, False
+        if i2 < i1:
+            return title_2, False
+        return (title_1 if len(title_1) >= len(title_2) else title_2), False
+    if i1 != -1:
+        return title_1, False
+    if i2 != -1:
+        return title_2, False
+
+    toks_1 = _title_tokens(title_1)
+    toks_2 = _title_tokens(title_2)
+    n1 = sum(1 for tok in toks_1
+             if re.search(rf"\b{re.escape(tok)}\b", text_l))
+    n2 = sum(1 for tok in toks_2
+             if re.search(rf"\b{re.escape(tok)}\b", text_l))
+    if n1 > n2:
+        return title_1, False
+    if n2 > n1:
+        return title_2, False
+    return None, True
 
 
 def ab_titles(liked: str, disliked: str, pair_id: str) -> tuple[str, str]:
@@ -159,7 +204,7 @@ def stage_generate(cfg: dict, out_dir: Path) -> Path:
                 "gt_disliked": gt_disliked,
                 "title_a": ta,
                 "title_b": tb,
-                "instruction": render_instruction(ta, tb),
+                "instruction": render_instruction(title_1=ta, title_2=tb),
             })
         liked_prof, disliked_prof = build_profile(tr_rows, profile_k, seed=u)
         user_data[u] = {
@@ -199,12 +244,15 @@ def stage_generate(cfg: dict, out_dir: Path) -> Path:
                 max_new_tokens=max_new,
                 max_input_tokens=icl_max,
             )
+            parsed, ambiguous = parse_choice(rec, p["title_a"], p["title_b"])
             append({
                 "user_id": u, "pair_id": p["pair_id"],
                 "condition": "base",
                 "title_a": p["title_a"], "title_b": p["title_b"],
                 "gt_liked": p["gt_liked"], "gt_disliked": p["gt_disliked"],
                 "recommendation": rec,
+                "parsed_choice": parsed,
+                "ambiguous": ambiguous,
             })
             rec_icl = generate_recommendation(
                 bm, tokenizer, p["instruction"],
@@ -212,12 +260,15 @@ def stage_generate(cfg: dict, out_dir: Path) -> Path:
                 max_new_tokens=max_new,
                 max_input_tokens=icl_max,
             )
+            parsed_icl, ambiguous_icl = parse_choice(rec_icl, p["title_a"], p["title_b"])
             append({
                 "user_id": u, "pair_id": p["pair_id"],
                 "condition": "icl_chat",
                 "title_a": p["title_a"], "title_b": p["title_b"],
                 "gt_liked": p["gt_liked"], "gt_disliked": p["gt_disliked"],
                 "recommendation": rec_icl,
+                "parsed_choice": parsed_icl,
+                "ambiguous": ambiguous_icl,
             })
         print(f"  user {u}: base + icl_chat done ({len(ud['pairs'])} pairs)")
     del bm
@@ -264,12 +315,15 @@ def stage_generate(cfg: dict, out_dir: Path) -> Path:
                 max_new_tokens=max_new,
                 max_input_tokens=icl_max,
             )
+            parsed, ambiguous = parse_choice(rec, p["title_a"], p["title_b"])
             append({
                 "user_id": u, "pair_id": p["pair_id"],
                 "condition": "simpo",
                 "title_a": p["title_a"], "title_b": p["title_b"],
                 "gt_liked": p["gt_liked"], "gt_disliked": p["gt_disliked"],
                 "recommendation": rec,
+                "parsed_choice": parsed,
+                "ambiguous": ambiguous,
             })
         del trainer, m
         free_memory()
@@ -404,6 +458,31 @@ def stage_summary(out_dir: Path) -> None:
         games_per_condition[cond_x] += 1
         games_per_condition[cond_y] += 1
 
+    # ── GT-alignment from the parsed-choice column in judge_generations.jsonl
+    gens = [json.loads(line) for line in open(out_dir / "judge_generations.jsonl")]
+    gt_alignment: dict = {}
+    for c in CONDITIONS:
+        rows = [g for g in gens if g["condition"] == c]
+        n_total = len(rows)
+        n_ambiguous = sum(1 for g in rows if g.get("ambiguous"))
+        parsed_rows = [g for g in rows if not g.get("ambiguous")]
+        n_parsed = len(parsed_rows)
+        n_aligned = sum(1 for g in parsed_rows if g.get("parsed_choice") == g["gt_liked"])
+        if n_parsed:
+            rate = n_aligned / n_parsed
+            p_value = binomtest(n_aligned, n_parsed, 0.5, alternative="greater").pvalue
+        else:
+            rate = None
+            p_value = None
+        gt_alignment[c] = {
+            "n_total": n_total,
+            "n_ambiguous": n_ambiguous,
+            "n_parsed": n_parsed,
+            "n_aligned": n_aligned,
+            "rate": rate,
+            "p_value_one_sided": p_value,
+        }
+
     summary = {
         "n_judgments": len(results),
         "n_errors": errors,
@@ -413,6 +492,7 @@ def stage_summary(out_dir: Path) -> None:
             if games_per_condition[c] else None
             for c in CONDITIONS
         },
+        "gt_alignment": gt_alignment,
     }
     path = out_dir / "judge_summary.json"
     with open(path, "w") as f:
@@ -427,6 +507,15 @@ def stage_summary(out_dir: Path) -> None:
     for c, wr in summary["win_rate_overall"].items():
         wr_s = f"{wr:.3f}" if wr is not None else "n/a"
         print(f"    {c:>8}: {wr_s}")
+    print("  GT alignment (parsed choice == liked book):")
+    for c in CONDITIONS:
+        a = gt_alignment[c]
+        rate_s = f"{a['rate']:.3f}" if a["rate"] is not None else "n/a"
+        p_s = f"{a['p_value_one_sided']:.3f}" if a["p_value_one_sided"] is not None else "n/a"
+        print(
+            f"    {c:>8}: {a['n_aligned']:>2}/{a['n_parsed']:<2} "
+            f"(rate={rate_s}, p={p_s}, ambig={a['n_ambiguous']})"
+        )
     print(f"\nSummary → {path}")
 
 

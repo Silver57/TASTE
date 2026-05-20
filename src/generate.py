@@ -12,15 +12,14 @@ import torch
 
 
 INSTRUCTION_TEMPLATE = (
-    "In one sentence, recommend whether this reader will prefer\n"
-    "  A: {title_a}\n"
-    "  B: {title_b}\n"
-    "and briefly justify why."
+    'Two books to consider for this reader: "{title_1}" and "{title_2}". '
+    'In one sentence, name which of the two books the reader would prefer '
+    '(use the exact title) and briefly justify why.'
 )
 
 
-def render_instruction(title_a: str, title_b: str) -> str:
-    return INSTRUCTION_TEMPLATE.format(title_a=title_a, title_b=title_b)
+def render_instruction(title_1: str, title_2: str) -> str:
+    return INSTRUCTION_TEMPLATE.format(title_1=title_1, title_2=title_2)
 
 
 def _build_messages(demos, instruction: str) -> list[dict]:

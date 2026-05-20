@@ -12,7 +12,7 @@ model_id: meta-llama/Meta-Llama-3-8B-Instruct
 # wins can be cross-referenced against the main sweep's logged accuracies.
 main_results_path: Final Results/15_05_base_results/results.json
 n_judge_users: 10
-n_judge_pairs: 5
+n_judge_pairs: 10
 
 # Conditions (base/untrained always included as catch trial)
 simpo_n_train: 100
@@ -51,5 +51,5 @@ judge_order_seed: 7
 profile_size: 5  # 5 liked + 5 disliked shown to the judge
 
 # Safety caps
-max_api_calls: 200       # expected ~150; aborts run if exceeded
+max_api_calls: 200       # expected ~300; aborts run if exceeded
 hard_budget_usd: 3.00

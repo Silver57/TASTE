@@ -47,13 +47,13 @@ bash setup.sh               # installs deps + logs into HF
 #    GoodReads: data/raw/GoodReads/ratings.csv + books.csv
 
 # 3. Generate preference pairs
-python scripts/prepare_data.py --config configs/goodreads.yaml
+python scripts/prepare_data.py --config configs/20_05_goodreads_recsys.yaml
 
 # 4. Run the cold-start sweep
-python scripts/run_sweep.py --config configs/goodreads.yaml
+python scripts/run_sweep.py --config configs/20_05_goodreads_recsys.yaml
 
 # 5. Plot results
-python scripts/plot_results.py --results outputs/goodreads/1results.json
+python scripts/plot_results.py --results outputs/20_05_goodreads_recsys/1results.json
 ```
 
 ## Prompt template ablation
@@ -74,10 +74,10 @@ run **all** variants:
 
 ```bash
 # Generate pairs for every template
-python scripts/prepare_data.py --config configs/goodreads.yaml --ablate-prompts
+python scripts/prepare_data.py --config configs/20_05_goodreads_recsys.yaml --ablate-prompts
 
 # Train + evaluate every template
-python scripts/run_sweep.py --config configs/goodreads.yaml --ablate-prompts
+python scripts/run_sweep.py --config configs/20_05_goodreads_recsys.yaml --ablate-prompts
 ```
 
 Results are saved as `results_<name>.json` (e.g. `results_simple.json`,
@@ -85,11 +85,11 @@ Results are saved as `results_<name>.json` (e.g. `results_simple.json`,
 
 ```bash
 # Point at the output directory — picks up all results_*.json automatically
-python scripts/plot_results.py --results-dir outputs/goodreads/
+python scripts/plot_results.py --results-dir outputs/20_05_goodreads_recsys/
 
 # Or list files explicitly
-python scripts/plot_results.py --results outputs/goodreads/results_simple.json \
-                                          outputs/goodreads/results_detailed.json
+python scripts/plot_results.py --results outputs/20_05_goodreads_recsys/results_simple.json \
+                                          outputs/20_05_goodreads_recsys/results_detailed.json
 ```
 
 This produces:
@@ -103,8 +103,8 @@ user counts, a single cold-start size, and smaller LoRA rank so you can verify
 the pipeline end-to-end on a laptop:
 
 ```bash
-python scripts/prepare_data.py --config configs/goodreads.yaml --smoke-test
-python scripts/run_sweep.py   --config configs/goodreads.yaml --smoke-test
+python scripts/prepare_data.py --config configs/20_05_goodreads_recsys.yaml --smoke-test
+python scripts/run_sweep.py   --config configs/20_05_goodreads_recsys.yaml --smoke-test
 ```
 
 This automatically loads `configs/goodreads_smoke.yaml` instead. Both flags
@@ -137,7 +137,7 @@ All hyperparameters live in YAML files so experiments are reproducible
 without editing code. Override any value from the CLI:
 
 ```bash
-python scripts/run_sweep.py --config configs/goodreads.yaml \
+python scripts/run_sweep.py --config configs/20_05_goodreads_recsys.yaml \
     --cold_start_sizes 3 5 10 20 50 \
     --n_eval_users 10 \
     --num_train_epochs 3

@@ -1,7 +1,7 @@
 # configs/goodreads_smoke.yaml — A100 smoke test
 # Goal: validate all 7 methods produce distinguishable results on real model
 # Target runtime: ~5 min on A100 80GB
-dataset: goodreads
+dataset: 20_05_goodreads_recsys
 data_dir: data/raw/GoodReads
 output_dir: outputs/goodreads_smoke
 pair_dir: data/goodreads_smoke_pairs
