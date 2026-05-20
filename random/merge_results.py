@@ -2,9 +2,9 @@
 Merge a TASTE main 1results.json (n=3,5,10,50) with an n=100 follow-up 1results.json.
 
 Usage:
-    python merge_results.py --main outputs_from_gpu/goodreads/1results.json \\
+    python merge_results.py --main outputs_from_gpu/20_05_goodreads_recsys/1results.json \\
                             --n100 outputs_from_gpu/goodreads_n100/1results.json \\
-                            --out  outputs_from_gpu/goodreads/results.json
+                            --out  outputs_from_gpu/20_05_goodreads_recsys/results.json
 
 The script:
   1. Validates that methods and seeds match across the two files.

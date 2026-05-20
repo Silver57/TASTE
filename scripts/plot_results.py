@@ -4,18 +4,18 @@ Step 3: Generate figures from saved results.
 
 Usage:
     # Single result file (unchanged behaviour)
-    python scripts/plot_results.py --results outputs/goodreads/results.json
+    python scripts/plot_results.py --results outputs/20_05_goodreads_recsys/results.json
 
     # Prompt ablation — pass every variant's file
-    python scripts/plot_results.py --results outputs/goodreads/results_simple.json \
-                                              outputs/goodreads/results_detailed.json \
-                                              outputs/goodreads/results_system.json
+    python scripts/plot_results.py --results outputs/20_05_goodreads_recsys/results_simple.json \
+                                              outputs/20_05_goodreads_recsys/results_detailed.json \
+                                              outputs/20_05_goodreads_recsys/results_system.json
 
     # Or just point at the directory and it picks up all results_*.json
-    python scripts/plot_results.py --results-dir outputs/goodreads/
+    python scripts/plot_results.py --results-dir outputs/20_05_goodreads_recsys/
 
     # Custom output directory
-    python scripts/plot_results.py --results-dir outputs/goodreads/ --out figures/
+    python scripts/plot_results.py --results-dir outputs/20_05_goodreads_recsys/ --out figures/
 """
 
 import argparse
@@ -38,6 +38,10 @@ STYLES = {
     "kto":      dict(color="orchid",       linestyle="-",  marker="D"),
     "icl_flat": dict(color="crimson",      linestyle=":",  marker="*"),
     "icl_chat": dict(color="mediumpurple", linestyle=":",  marker="X"),
+    # Classical recommender baselines
+    "pop":      dict(color="dimgray",      linestyle="--", marker="v"),
+    "iknn":     dict(color="saddlebrown",  linestyle="-.", marker="P"),
+    "bpr":      dict(color="teal",         linestyle="-.", marker="h"),
 }
 
 # Extra linestyles cycled across prompt variants in the ablation comparison plot

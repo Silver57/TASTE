@@ -3,8 +3,8 @@
 Step 2: Cold-start training sweep — DPO vs IPO vs SimPO vs KTO.
 
 Usage:
-    python scripts/run_sweep.py --config configs/goodreads.yaml
-    python scripts/run_sweep.py --config configs/goodreads.yaml --n_eval_users 10
+    python scripts/run_sweep.py --config configs/20_05_goodreads_recsys.yaml
+    python scripts/run_sweep.py --config configs/20_05_goodreads_recsys.yaml --n_eval_users 10
 
 Results are saved as JSON for later plotting.
 """

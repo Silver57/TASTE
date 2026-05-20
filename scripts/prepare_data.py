@@ -3,9 +3,9 @@
 Step 1: Load raw data → generate DPO + KTO preference pairs.
 
 Usage:
-    python scripts/prepare_data.py --config configs/goodreads.yaml
-    python scripts/prepare_data.py --config configs/goodreads.yaml --ablate-prompts
-    python scripts/prepare_data.py --config configs/goodreads.yaml --smoke-test
+    python scripts/prepare_data.py --config configs/20_05_goodreads_recsys.yaml
+    python scripts/prepare_data.py --config configs/20_05_goodreads_recsys.yaml --ablate-prompts
+    python scripts/prepare_data.py --config configs/20_05_goodreads_recsys.yaml --smoke-test
 """
 
 import argparse
@@ -91,7 +91,7 @@ def main():
     if dataset == "netflix":
         from src.data_netflix import load_netflix
         df = load_netflix(data_dir, min_reviews=cfg.get("min_reviews_per_movie", 20000))
-    elif dataset == "goodreads":
+    elif dataset == "20_05_goodreads_recsys":
         from src.data_goodreads import load_goodreads
         df = load_goodreads(data_dir, min_reviews=cfg.get("min_reviews_per_book", 20000))
     else:
